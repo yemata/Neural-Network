@@ -2,19 +2,45 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import datasets
 
-np.random.seed(0)
-X, y = datasets.make_blobs(300, centers=3)
-
-N = len(X) # training set size
-nn_input_dim = 2 # input layer dimensionality
-nn_output_dim = 3 # output layer dimensionality
-
 # Gradient descent parameters
 epsilon = 0.01 # learning rate
 reg_lambda = 0.01 # regularization strength
 
+def generate_data(nn_output_dim, nn_input_dim=2, n_samples=100):
+    np.random.seed(0)
+    type = input("Please select one of the following data sets:\n"
+                       + "\t1. moons\n"
+                       + "\t2. blobs\n"
+                       + "\t3. random\n")
+
+    X, y = {}, {}
+
+    if type == 1:
+        if nn_output_dim == 2:
+            X, y = datasets.make_moons(n_samples, noise=0.1)
+    elif type == 2:
+        X, y = datasets.make_blobs(n_samples, centers=nn_output_dim)
+    elif type == 3:
+        X, y = generate_random_data(nn_output_dim, nn_input_dim, n_samples)
+
+    return X, y
+
+def generate_random_data(n_classes, n_features, n_samples):
+    max_classes = n_features * 2
+    if (n_classes > max_classes):
+        return {}, {}
+
+    n_clusters_per_class = max_classes // n_classes
+
+    n_informative = n_features
+    n_redundant = 0
+    n_repeated = 0
+
+    return datasets.make_classification(n_samples, n_features, n_informative, n_redundant, n_repeated,
+                                        n_classes, n_clusters_per_class)
 # Helper function to evaluate the total loss on the data set
-def calculate_loss(model):
+def calculate_loss(model, X, y):
+    N = len(X)  # training set size
     W1, b1, W2, b2 = model['W1'], model['b1'], model['W2'], model['b2']
 
     # Forward propagation
@@ -50,12 +76,7 @@ def predict(model, x, print_raw=False):
 
     return np.argmax(probs, axis=1)
 
-# Learn parameters for the neural network and return model
-# - nn_hdim: number of nodes in hidden layer
-# - num_passes: number of passes through the training data for gradient descent
-# - print_loss: if true, print loss every 1000 iterations
-def build_model(nn_hdim, num_passes=20000, print_loss=False):
-
+def initialize_model(nn_hdim, nn_output_dim, nn_input_dim=2):
     print "Initializing network parameters..."
     # Initialize parameters to random values
     np.random.seed(0)
@@ -64,13 +85,18 @@ def build_model(nn_hdim, num_passes=20000, print_loss=False):
     W2 = np.random.randn(nn_hdim, nn_output_dim) / np.sqrt(nn_hdim)
     b2 = np.zeros((1, nn_output_dim))
 
-    print "Initial network parameters:"
-    print "First layer weights\n", W1,\
-        "\nFirst layer biases\n", b1,\
-        "\nSecond layer weights\n", W2,\
-        "\nSecond layer biases\n", b2
+    model = {'W1': W1, 'b1': b1, 'W2': W2, 'b2': b2}
+    return model
 
-    model = {}
+# Learn parameters for the neural network and return model
+# - nn_hdim: number of nodes in hidden layer
+# - num_passes: number of passes through the training data for gradient descent
+# - print_loss: if true, print loss every 1000 iterations
+def build_model(model, X, y, num_passes=20000, print_loss=False):
+    print "Training neural network..."
+
+    N = len(X)  # training set size
+    W1, b1, W2, b2 = model['W1'], model['b1'], model['W2'], model['b2']
 
     print "Performing gradient descent..."
     # Gradient descent
@@ -109,18 +135,14 @@ def build_model(nn_hdim, num_passes=20000, print_loss=False):
 
         # optionally print loss
         if print_loss and i % 1000 == 0:
-            print "Loss after iteration %i: %f" %(i, calculate_loss(model))
+            print "Loss after iteration %i: %f" %(i, calculate_loss(model, X, y))
 
-    print "Final network parameters:"
-    print "First layer weights\n", W1, \
-        "\nFirst layer biases\n", b1, \
-        "\nSecond layer weights\n", W2, \
-        "\nSecond layer biases\n", b2
+    print "Training complete!"
 
     return model
 
 # Helper function to plot a decision boundary
-def plot_decision_boundary(pred_func):
+def plot_decision_boundary(pred_func, X, y):
 
     # Set min and max values and give it some padding
     x_min, x_max = X[:, 0].min() - .5, X[:, 0].max() + .5
@@ -138,31 +160,60 @@ def plot_decision_boundary(pred_func):
     plt.contourf(xx, yy, Z, cmap=plt.cm.Spectral)
     plt.scatter(X[:, 0], X[:, 1], c=y, cmap=plt.cm.Spectral)
 
+def display_decision_boundary(model, X, y):
+    plt.close()
+    plot_decision_boundary(lambda x: predict(model, x), X, y)
+    plt.title("Single-Layer Network Size-%d" % len(model))
+    plt.show(False)
+
+def classify_single_point(model):
+    x_data = input("Please enter x-coordinate: ")
+    y_data = input("Please enter y-coordinate: ")
+
+    data = np.array([x_data, y_data])
+    prediction = predict(model, data, True)
+    translation = "male" if prediction == 1 else "female"
+
+    print "Data has been identified as %s" % translation
+
+def prompt_init_data():
+    nn_output_dim = input("Please select the number of classes to classify: ")
+    nn_hdim = input("Please select the dimensionality of the hidden layer: ")
+
+    return nn_output_dim, nn_hdim
+
+def validate_dataset(X):
+    if len(X) < 2:
+        print "Invalid data set! Exiting program."
+        return False
+
+    return True
+
 def main():
-    nn_hdim = 4
+    nn_output_dim, nn_hdim = prompt_init_data()
 
-    print "Training single-layer %i dimensional network...\n" %nn_hdim
-    model = build_model(nn_hdim)
+    X, y = generate_data(nn_output_dim)
+    model = initialize_model(nn_hdim, nn_output_dim)
 
-    option = input ("Training complete!\n\n"
-                    "Please select next option:\n"
-                    + "1. Classify single data point\n"
-                    + "2. Display prediction boundaries\n")
+    while True:
+        if not validate_dataset(X):
+            break
 
-    if option == 1:
-        x_data = input("Please enter x-coordinate: ")
-        y_data = input("Please enter y-coordinate: ")
+        option = input("Please select an option:\n"
+                       + "\t0. Exit program\n"
+                       + "\t1. Train neural network\n"
+                       + "\t2. Display prediction boundaries\n"
+                       + "\t3. Classify single data point\n")
 
-        data = np.array([x_data, y_data])
-        prediction = predict(model, data, True)
-        translation = "male" if prediction==1 else "female"
+        if option == 0:
+            break
+        elif option == 1:
+            model = build_model(model, X, y)
+        elif option == 2:
+            display_decision_boundary(model, X, y)
+        elif option == 3:
+            classify_single_point(model)
 
-        print "Data has been identified as %s" %translation
-
-    if option == 2:
-        plot_decision_boundary(lambda x: predict(model, x))
-        plt.title("Single-Layer Network Size-%d" % nn_hdim)
-        plt.show()
 
 if __name__ == '__main__':
     main()
