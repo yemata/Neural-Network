@@ -2,9 +2,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn import datasets
 
+# matplotlib constants
+display_block = False
+
 # Gradient descent parameters
 epsilon = 0.01 # learning rate
 reg_lambda = 0.01 # regularization strength
+
+# UI Menu options
+option_exit = 0
+option_vis_dataset = 1
+option_train_neuralnet = 2
+option_display_prediction = 3
+option_classify_datapoint = 4
 
 def generate_data(nn_output_dim, nn_input_dim=2, n_samples=100):
     np.random.seed(0)
@@ -38,6 +48,7 @@ def generate_random_data(n_classes, n_features, n_samples):
 
     return datasets.make_classification(n_samples, n_features, n_informative, n_redundant, n_repeated,
                                         n_classes, n_clusters_per_class)
+
 # Helper function to evaluate the total loss on the data set
 def calculate_loss(model, X, y):
     N = len(X)  # training set size
@@ -45,7 +56,7 @@ def calculate_loss(model, X, y):
 
     # Forward propagation
     z1 = X.dot(W1) + b1
-    a1 = np.tanh(z1)
+    a1 = np.tanh(z1) # activation function
     z2 = a1.dot(W2) + b2
 
     # Soft max
@@ -63,7 +74,7 @@ def predict(model, x, print_raw=False):
 
     # Forward propagation
     z1 = x.dot(W1) + b1
-    a1 = np.tanh(z1)
+    a1 = np.tanh(z1) # activation function
     z2 = a1.dot(W2) + b2
 
     # Soft max
@@ -164,17 +175,51 @@ def display_decision_boundary(model, X, y):
     plt.close()
     plot_decision_boundary(lambda x: predict(model, x), X, y)
     plt.title("Single-Layer Network Size-%d" % len(model))
-    plt.show(False)
+    plt.show(display_block)
 
-def classify_single_point(model):
-    x_data = input("Please enter x-coordinate: ")
-    y_data = input("Please enter y-coordinate: ")
+def classify_single_point(model, n_classes):
+    max_classes = 4
+    if n_classes > max_classes:
+        print "This feature is only supported for up to %i classes." %max_classes
+        return
+
+    x_data = input("Please enter a value for the first feature: ")
+    y_data = input("Please enter a value for the second feature: ")
 
     data = np.array([x_data, y_data])
     prediction = predict(model, data, True)
-    translation = "male" if prediction == 1 else "female"
 
-    print "Data has been identified as %s" % translation
+    colorname = 'unrecognized'
+
+    # TODO: use color map instead of disgusting if spaghetti
+    if n_classes == 2:
+        if prediction == 0:
+            colorname = 'red'
+        elif prediction == 1:
+            colorname = 'blue'
+    elif n_classes == 3:
+        if prediction == 0:
+            colorname = 'red'
+        elif prediction == 1:
+            colorname = 'yellow'
+        elif prediction == 2:
+            colorname = 'blue'
+    elif n_classes == 4:
+        if prediction == 0:
+            colorname = 'red'
+        elif prediction == 1:
+            colorname = 'orange'
+        elif prediction == 2:
+            colorname = 'green'
+        elif prediction == 3:
+            colorname = 'blue'
+
+    print "Data has been identified as %s" % colorname
+
+def visualize_dataset(X, y):
+    plt.close()
+    plt.scatter(X[:, 0], X[:, 1], c=y, cmap=plt.cm.Spectral)
+    plt.show(display_block)
 
 def prompt_init_data():
     nn_output_dim = input("Please select the number of classes to classify: ")
@@ -184,36 +229,42 @@ def prompt_init_data():
 
 def validate_dataset(X):
     if len(X) < 2:
-        print "Invalid data set! Exiting program."
+        print "Invalid data set! Please try again."
         return False
 
     return True
 
 def main():
+    # TODO: replace this nonsense with Python do while loop
     nn_output_dim, nn_hdim = prompt_init_data()
 
     X, y = generate_data(nn_output_dim)
     model = initialize_model(nn_hdim, nn_output_dim)
 
+    while not validate_dataset(X):
+        nn_output_dim, nn_hdim = prompt_init_data()
+
+        X, y = generate_data(nn_output_dim)
+        model = initialize_model(nn_hdim, nn_output_dim)
+
     while True:
-        if not validate_dataset(X):
-            break
-
         option = input("Please select an option:\n"
-                       + "\t0. Exit program\n"
-                       + "\t1. Train neural network\n"
-                       + "\t2. Display prediction boundaries\n"
-                       + "\t3. Classify single data point\n")
+                       + "\t%i. Exit program\n" %option_exit
+                       + "\t%i. Visualize data set\n" %option_vis_dataset
+                       + "\t%i. Train neural network\n" %option_train_neuralnet
+                       + "\t%i. Display prediction boundaries\n" %option_display_prediction
+                       + "\t%i. Classify single data point\n" %option_classify_datapoint)
 
-        if option == 0:
+        if option == option_exit:
             break
-        elif option == 1:
+        elif option == option_vis_dataset:
+            visualize_dataset(X, y)
+        elif option == option_train_neuralnet:
             model = build_model(model, X, y)
-        elif option == 2:
+        elif option == option_display_prediction:
             display_decision_boundary(model, X, y)
-        elif option == 3:
-            classify_single_point(model)
-
+        elif option == option_classify_datapoint:
+            classify_single_point(model, nn_output_dim)
 
 if __name__ == '__main__':
     main()
